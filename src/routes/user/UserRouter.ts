@@ -1,17 +1,16 @@
 import express = require('express')
-import BaseApi = require('../../api/BaseApi')
-import ApiStatusCodes = require('../../api/ApiStatusCodes')
-import Injector = require('../../injection/Injector')
-import SystemRouter = require('./system/SystemRouter')
-import AppsRouter = require('./apps/AppsRouter')
-import Logger = require('../../utils/Logger')
-import RegistriesRouter = require('./registeries/RegistriesRouter')
-import onFinished = require('on-finished')
-import InjectionExtractor = require('../../injection/InjectionExtractor')
-import CaptainManager = require('../../user/system/CaptainManager')
+import ApiStatusCodes from '../../api/ApiStatusCodes'
+import BaseApi from '../../api/BaseApi'
+import InjectionExtractor from '../../injection/InjectionExtractor'
+import * as Injector from '../../injection/Injector'
+import Authenticator from '../../user/Authenticator'
+import EnvVars from '../../utils/EnvVars'
 import Utils from '../../utils/Utils'
-import EnvVars = require('../../utils/EnvVars')
-import Authenticator = require('../../user/Authenticator')
+import AppsRouter from './apps/AppsRouter'
+import OneClickAppRouter from './oneclick/OneClickAppRouter'
+import RegistriesRouter from './registeries/RegistriesRouter'
+import SystemRouter from './system/SystemRouter'
+import onFinished = require('on-finished')
 
 const router = express.Router()
 
@@ -21,7 +20,7 @@ router.use('/apps/webhooks/', Injector.injectUserForWebhook())
 
 router.use(Injector.injectUser())
 
-router.use(function(req, res, next) {
+router.use(function (req, res, next) {
     const user = InjectionExtractor.extractUserFromInjected(res).user
 
     if (!user) {
@@ -84,7 +83,7 @@ router.use(function(req, res, next) {
 
         // we don't want the same space to go under two simultaneous changes
         threadLockNamespace[namespace] = true
-        onFinished(res, function() {
+        onFinished(res, function () {
             threadLockNamespace[namespace] = false
         })
     }
@@ -92,27 +91,27 @@ router.use(function(req, res, next) {
     next()
 })
 
-router.post('/changepassword/', function(req, res, next) {
+router.post('/changepassword/', function (req, res, next) {
     const namespace = InjectionExtractor.extractUserFromInjected(res).user
         .namespace
     const dataStore = InjectionExtractor.extractUserFromInjected(res).user
         .dataStore
 
     Promise.resolve() //
-        .then(function(data) {
+        .then(function (data) {
             return dataStore.getHashedPassword()
         })
-        .then(function(savedHashedPassword) {
+        .then(function (savedHashedPassword) {
             return Authenticator.getAuthenticator(namespace).changepass(
                 req.body.oldPassword,
                 req.body.newPassword,
                 savedHashedPassword
             )
         })
-        .then(function(hashedPassword) {
+        .then(function (hashedPassword) {
             return dataStore.setHashedPassword(hashedPassword)
         })
-        .then(function() {
+        .then(function () {
             res.send(new BaseApi(ApiStatusCodes.STATUS_OK, 'Password changed.'))
         })
         .catch(ApiStatusCodes.createCatcher(res))
@@ -120,8 +119,10 @@ router.post('/changepassword/', function(req, res, next) {
 
 router.use('/apps/', AppsRouter)
 
+router.use('/oneclick/', OneClickAppRouter)
+
 router.use('/registries/', RegistriesRouter)
 
 router.use('/system/', SystemRouter)
 
-export = router
+export default router
